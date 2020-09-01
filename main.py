@@ -2,7 +2,6 @@ from flask import Flask, make_response, g
 import psycopg2
 
 app = Flask(__name__)
-app.teardown_appcontext(db_close)
 
 DATABASE = {
     'user':     'pramsey',
@@ -11,10 +10,6 @@ DATABASE = {
     'port':     '5432',
     'database': 'nyc'
 }
-
-
-def db_close():
-    return
 
 
 @app.route('/tile/<string:table>/<int:zoom>/<int:x>/<int:y>/<string:format>')
@@ -79,12 +74,12 @@ def get_tile(table, zoom, x, y, format):
     db_conn = g.db
 
     with db_conn.cursor() as cursor:
-        try:
-            cursor.execute(sql_query)
-            if not cursor:
-                return ('db request failed', 400)
+        cursor.execute(sql_query)
+        if not cursor:
+            return ('db request failed', 400)
 
-            resp = make_response(cursor.fetchone()[0])
-            resp.headers['Content-type'] = 'application/vnd.mapbox-vector-tile'
-            resp.headers['Access-Control-Allow-Origin'] = '*'
-            return resp
+        resp = make_response(cursor.fetchone()[0])
+        resp.headers['Content-type'] = 'application/vnd.mapbox-vector-tile'
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+
+        return resp
