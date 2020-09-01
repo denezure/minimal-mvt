@@ -1,6 +1,8 @@
-from flask import Flask
+from flask import Flask, make_response, g
+import psycopg2
 
 app = Flask(__name__)
+app.teardown_appcontext(db_close)
 
 DATABASE = {
     'user':     'pramsey',
@@ -9,6 +11,10 @@ DATABASE = {
     'port':     '5432',
     'database': 'nyc'
 }
+
+
+def db_close():
+    return
 
 
 @app.route('/tile/<string:table>/<int:zoom>/<int:x>/<int:y>/<string:format>')
@@ -40,6 +46,8 @@ def get_tile(table, zoom, x, y, format):
     # safely converted to other coordinate systems.
     DENSIFY_FACTOR = 4
     segSize = (xmax - xmin)/DENSIFY_FACTOR
+    # No idea what this magic # is
+    magic1 = 3857
     env = f'ST_Segmentize(ST_MakeEnvelope({xmin}, {ymin}, {xmax}, {ymax}, 3857),{segSize})'
 
     # Generate a SQL query to pull a tile worth of MVT data
@@ -47,8 +55,7 @@ def get_tile(table, zoom, x, y, format):
 
     # Magic string ?
     geomColumn = 'geom'
-    # No idea what these magic #s are
-    magic1 = 3857
+    # No idea what this magic # is
     srid = 26918
 
     sql_query = f'''
@@ -66,7 +73,10 @@ def get_tile(table, zoom, x, y, format):
     '''
 
     # TODO: Exception handling
-    db_conn = pyscopg2.connect(**DATABASE)
+    if 'db' not in g:
+        g.db = pyscopg2.connect(**DATABASE)
+
+    db_conn = g.db
 
     with db_conn.cursor() as cursor:
         try:
@@ -78,5 +88,3 @@ def get_tile(table, zoom, x, y, format):
             resp.headers['Content-type'] = 'application/vnd.mapbox-vector-tile'
             resp.headers['Access-Control-Allow-Origin'] = '*'
             return resp
-        finally:
-            db_conn.close()
